@@ -1,11 +1,12 @@
 module github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver
 
-go 1.22.0
+go 1.23.2
 
 require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/iancoleman/strcase v0.3.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/leaderelector v0.112.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.112.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.112.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.112.0
@@ -159,3 +160,5 @@ replace github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8ste
 replace github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent => ../../internal/sharedcomponent
 
 replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/golden => ../../pkg/golden
+
+replace github.com/open-telemetry/opentelemetry-collector-contrib/extension/leaderelector => ../../extension/leaderelector

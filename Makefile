@@ -280,6 +280,7 @@ all-pwd:
 .PHONY: run
 run:
 	cd ./cmd/otelcontribcol && GO111MODULE=on $(GOCMD) run --race . --config ../../${RUN_CONFIG} ${RUN_ARGS}
+	#cd ./cmd/otelcontribcol && GO111MODULE=on $(GOCMD) run --race . --config ../../${RUN_CONFIG} ${RUN_ARGS}
 
 .PHONY: docker-component # Not intended to be used directly
 docker-component: check-component
@@ -346,7 +347,8 @@ chlog-update: $(CHLOGGEN)
 .PHONY: genotelcontribcol
 genotelcontribcol: $(BUILDER)
 	$(BUILDER) --skip-compilation --config cmd/otelcontribcol/builder-config.yaml --output-path cmd/otelcontribcol
-
+	#$(BUILDER) --skip-compilation --config cmd/otelcontribcol/builder-config.yaml
+	#$(MAKE) --no-print-directory -C cmd/otelkymacol fmt
 # Build the Collector executable.
 .PHONY: otelcontribcol
 otelcontribcol: genotelcontribcol

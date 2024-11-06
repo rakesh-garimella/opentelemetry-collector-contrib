@@ -7,10 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/leaderelector"
+	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.uber.org/zap"
 	"time"
 
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pipeline"
 	"go.opentelemetry.io/collector/receiver"
@@ -43,12 +45,12 @@ type getExporters interface {
 	GetExporters() map[pipeline.Signal]map[component.ID]component.Component
 }
 
-func (kr *kubernetesReceiver) Start(ctx context.Context, host component.Host) error {
-	ctx, kr.cancel = context.WithCancel(ctx)
-
+func (kr *kubernetesReceiver) startReceiver(ctx context.Context, host component.Host) error {
 	if err := kr.resourceWatcher.initialize(); err != nil {
 		return err
 	}
+
+	kr.settings.Logger.Info("We got the lease starting the receiver!!")
 
 	ge, ok := host.(getExporters)
 	if !ok {
@@ -98,15 +100,116 @@ func (kr *kubernetesReceiver) Start(ctx context.Context, host component.Host) er
 			}
 		}
 	}()
+	return nil
+}
+
+func (kr *kubernetesReceiver) stopReceiver() error {
+	kr.settings.Logger.Info("Stopping the receiver!!")
+	if kr.cancel == nil {
+		return nil
+	}
+	kr.cancel()
+	return nil
+}
+
+func (kr *kubernetesReceiver) Start(ctx context.Context, host component.Host) error {
+	ctx, kr.cancel = context.WithCancel(ctx)
+
+	if kr.config.LeaseName != nil {
+		kr.settings.Logger.Info("Starting k8sClusterReceiver with leader election!!")
+		extList := host.GetExtensions()
+		if extList == nil {
+			return errors.New("no extensions found")
+		}
+
+		ext := extList[component.ID(kr.config.LeaseName.Id)]
+		if ext == nil {
+			return errors.New("extension not found")
+		}
+
+		leaderElectorExt := ext.(leaderelector.LeaderElection)
+
+		leaderElectorExt.SetCallBackFuncs(
+			func(ctx context.Context) {
+				if err := kr.startReceiver(ctx, host); err != nil {
+					kr.settings.Logger.Error("Failed to start receiver", zap.Error(err))
+				}
+
+			}, func() {
+				if err := kr.stopReceiver(); err != nil {
+					kr.settings.Logger.Error("Failed to stop receiver", zap.Error(err))
+				}
+			},
+		)
+
+	} else {
+		kr.settings.Logger.Info("Starting k8sClusterReceiver without leader election!!")
+		if err := kr.startReceiver(ctx, host); err != nil {
+			return err
+		}
+	}
+
+	//if err := kr.resourceWatcher.initialize(); err != nil {
+	//	return err
+	//}
+	//
+	//ge, ok := host.(getExporters)
+	//if !ok {
+	//	return fmt.Errorf("unable to get exporters")
+	//}
+	//exporters := ge.GetExporters()
+	//
+	//if err := kr.resourceWatcher.setupMetadataExporters(
+	//	exporters[pipeline.SignalMetrics], kr.config.MetadataExporters); err != nil {
+	//	return err
+	//}
+	//
+	//go func() {
+	//	kr.settings.Logger.Info("Starting shared informers and wait for initial cache sync.")
+	//	for _, informer := range kr.resourceWatcher.informerFactories {
+	//		if informer == nil {
+	//			continue
+	//		}
+	//		timedContextForInitialSync := kr.resourceWatcher.startWatchingResources(ctx, informer)
+	//
+	//		// Wait till either the initial cache sync times out or until the cancel method
+	//		// corresponding to this context is called.
+	//		<-timedContextForInitialSync.Done()
+	//
+	//		// If the context times out, set initialSyncTimedOut and report a fatal error. Currently
+	//		// this timeout is 10 minutes, which appears to be long enough.
+	//		if errors.Is(timedContextForInitialSync.Err(), context.DeadlineExceeded) {
+	//			kr.resourceWatcher.initialSyncTimedOut.Store(true)
+	//			kr.settings.Logger.Error("Timed out waiting for initial cache sync.")
+	//			componentstatus.ReportStatus(host, componentstatus.NewFatalErrorEvent(errors.New("failed to start receiver")))
+	//			return
+	//		}
+	//	}
+	//
+	//	kr.settings.Logger.Info("Completed syncing shared informer caches.")
+	//	kr.resourceWatcher.initialSyncDone.Store(true)
+	//
+	//	ticker := time.NewTicker(kr.config.CollectionInterval)
+	//	defer ticker.Stop()
+	//
+	//	for {
+	//		select {
+	//		case <-ticker.C:
+	//			kr.dispatchMetrics(ctx)
+	//		case <-ctx.Done():
+	//			return
+	//		}
+	//	}
+	//}()
 
 	return nil
 }
 
 func (kr *kubernetesReceiver) Shutdown(context.Context) error {
-	if kr.cancel == nil {
-		return nil
-	}
-	kr.cancel()
+	//if kr.cancel == nil {
+	//	return nil
+	//}
+	//kr.cancel()
 	return nil
 }
 

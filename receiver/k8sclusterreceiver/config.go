@@ -5,6 +5,7 @@ package k8sclusterreceiver // import "github.com/open-telemetry/opentelemetry-co
 
 import (
 	"fmt"
+	"go.opentelemetry.io/collector/component"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
@@ -39,6 +40,12 @@ type Config struct {
 
 	// MetricsBuilderConfig allows customizing scraped metrics/attributes representation.
 	metadata.MetricsBuilderConfig `mapstructure:",squash"`
+
+	LeaseName *leaderElectionReceiver `mapstructure:"lease"`
+}
+
+type leaderElectionReceiver struct {
+	Id component.ID `mapstructure:"name"`
 }
 
 func (cfg *Config) Validate() error {
