@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/extension"
 	"time"
@@ -30,9 +31,18 @@ func CreateExtension(
 		return nil, errors.New("Invalid config, cannot create extension leaderelector")
 	}
 	fmt.Printf("Creating leaderelector extension with config: %+v\n", baseCfg)
+
+	// Initialize k8s client in factory as doing it in extension.Start()
+	// should cause race condition as http Proxy gets shared.
+	client, err := k8sconfig.MakeClient(baseCfg.APIConfig)
+	if err != nil {
+		return nil, errors.New("Failed to create k8s client")
+	}
+
 	return &leaderElectionExtension{
 		config: baseCfg,
 		logger: set.Logger,
+		client: client,
 	}, nil
 }
 
